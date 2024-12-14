@@ -18,6 +18,7 @@
 #include <QMenu>
 #include <QAction>
 #include <QPoint>
+#include <QTextEdit>
 #include "mapviewwidget.h"  // Ваш виджет для отображения карт
 #include "item.h"
 #include "spell.h"
@@ -69,6 +70,16 @@ private slots:
     void createNewItem(const QString &parentDirPath);
     void createNewSpell(const QString &parentDirPath);
     void on_cartItemDoubleClicked(const QModelIndex &index);  // Слот для обработки двойного клика на файле
+
+
+    void on_spellItemDoubleClicked(const QModelIndex &index);
+    void displaySpellContentInTab(const QString &jsonPath);
+    QString extractSpellContentFromJson(const QString &jsonPath);
+
+    void on_itemItemDoubleClicked(const QModelIndex &index);
+    void displayItemContentInTab(const QString &jsonPath);
+    QString extractItemContentFromJson(const QString &jsonPath);
+
 
 };
 #endif // MAINWINDOW_H

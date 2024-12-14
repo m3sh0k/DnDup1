@@ -13,7 +13,9 @@ MainWindow::MainWindow(QWidget *parent)
     connect(ui->cart_treeView, &QTreeView::doubleClicked, this, &MainWindow::on_cartItemDoubleClicked);
 
     connect(ui->spells_treeView, &QTreeView::customContextMenuRequested, this, &MainWindow::on_spells_treeView_customContextMenuRequested); // Подключение контекстного меню для заклинаний
+    connect(ui->spells_treeView, &QTreeView::doubleClicked, this, &MainWindow::on_spellItemDoubleClicked);
     connect(ui->item_treeView, &QTreeView::customContextMenuRequested, this, &MainWindow::on_item_treeView_customContextMenuRequested);     // Подключение контекстного меню для предметов
+    connect(ui->item_treeView, &QTreeView::doubleClicked, this, &MainWindow::on_itemItemDoubleClicked);
 
 }
 
@@ -220,6 +222,7 @@ void MainWindow::on_cartItemDoubleClicked(const QModelIndex &index)
     }
 }
 
+
 void MainWindow::addMapTab(const QString &jsonPath)
 {
     // Создание нового виджета для отображения карты
@@ -394,5 +397,157 @@ void MainWindow::addItemToDirectory(const QString &parentDirPath, const QString 
 
     itemsModel->setRootPath(QDir::currentPath()); // Перезагружаем модель для отображения изменений
 }
+
+// Метод для обработки двойного клика по элементу в дереве заклинаний
+void MainWindow::on_spellItemDoubleClicked(const QModelIndex &index)
+{
+    // Получаем полный путь к выбранному JSON файлу заклинания
+    QString jsonPath = spellsModel->filePath(index);
+
+    // Проверяем, что выбранный файл имеет расширение .json
+    if (jsonPath.endsWith(".json")) {
+        // Если файл JSON, извлекаем и отображаем его содержимое в новой вкладке
+        displaySpellContentInTab(jsonPath);  // Вызовем новый метод для отображения содержимого заклинания
+    } else {
+        // Если файл не является JSON, выводим сообщение в лог
+        qDebug() << "Выбран не JSON файл";
+    }
+}
+
+// Метод для отображения содержимого заклинания в новой вкладке
+void MainWindow::displaySpellContentInTab(const QString &jsonPath)
+{
+    qDebug() << "Displaying spell content in new tab";
+
+    // Создание нового виджета для отображения содержимого заклинания
+    QTextEdit *spellTextEdit = new QTextEdit(ui->tabWidget);  // создаем QTextEdit для отображения текста заклинания
+
+    // Загружаем данные из JSON файла с заклинанием
+    QString spellContent = extractSpellContentFromJson(jsonPath);
+    if (spellContent.isEmpty()) {
+        qWarning() << "No content to display";
+    }
+    spellTextEdit->setText(spellContent);  // Устанавливаем содержимое JSON в текстовый редактор
+
+    // Устанавливаем атрибут для виджета, чтобы он удалялся при закрытии вкладки
+    spellTextEdit->setAttribute(Qt::WA_DeleteOnClose);
+
+    // Добавляем новый виджет в вкладки (tabWidget) с названием, основанным на имени файла
+    int index = ui->tabWidget->addTab(spellTextEdit, QFileInfo(jsonPath).baseName());
+    qDebug() << "Added tab at index: " << index;
+
+    // Устанавливаем новый индекс вкладки как текущий, чтобы сразу переключиться на неё
+    ui->tabWidget->setCurrentIndex(index);  // Переключаемся на новую вкладку
+}
+
+
+
+// Метод для извлечения данных из JSON файла заклинания и формирования строки для отображения
+QString MainWindow::extractSpellContentFromJson(const QString &jsonPath)
+{
+    QFile file(jsonPath);
+    if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
+        qWarning() << "Не удалось открыть JSON файл:" << jsonPath;
+        return "";  // Возвращаем пустую строку, если файл не открыт
+    }
+
+    QJsonDocument doc = QJsonDocument::fromJson(file.readAll());
+    file.close();  // Закрываем файл после чтения
+
+    if (!doc.isObject()) {
+        qWarning() << "Некорректный формат JSON";
+        return "";  // Возвращаем пустую строку, если формат некорректен
+    }
+
+    // Получаем данные заклинания из JSON
+    QJsonObject obj = doc.object();
+    QString spellName = obj["name"].toString();
+    QString spellDescription = obj["description"].toString();
+
+    // Проверим, что данные корректны
+    qDebug() << "Spell Name: " << spellName;
+    qDebug() << "Spell Description: " << spellDescription;
+
+    // Формируем строку для отображения, которая содержит название и описание заклинания
+    QString spellContent = "Заклинание: " + spellName + "\n\nОписание:\n" + spellDescription;
+    return spellContent;
+}
+
+
+// Метод для обработки двойного клика по элементу в дереве заклинаний
+void MainWindow::on_itemItemDoubleClicked(const QModelIndex &index)
+{
+    // Получаем полный путь к выбранному JSON файлу заклинания
+    QString jsonPath = itemsModel->filePath(index);
+
+    // Проверяем, что выбранный файл имеет расширение .json
+    if (jsonPath.endsWith(".json")) {
+        // Если файл JSON, извлекаем и отображаем его содержимое в новой вкладке
+        displayItemContentInTab(jsonPath);  // Вызовем новый метод для отображения содержимого заклинания
+    } else {
+        // Если файл не является JSON, выводим сообщение в лог
+        qDebug() << "Выбран не JSON файл";
+    }
+}
+
+// Метод для отображения содержимого заклинания в новой вкладке
+void MainWindow::displayItemContentInTab(const QString &jsonPath)
+{
+    qDebug() << "Displaying spell content in new tab";
+
+    // Создание нового виджета для отображения содержимого заклинания
+    QTextEdit *itemTextEdit = new QTextEdit(ui->tabWidget);  // создаем QTextEdit для отображения текста заклинания
+
+    // Загружаем данные из JSON файла с заклинанием
+    QString itemContent = extractItemContentFromJson(jsonPath);
+    if (itemContent.isEmpty()) {
+        qWarning() << "No content to display";
+    }
+    itemTextEdit->setText(itemContent);  // Устанавливаем содержимое JSON в текстовый редактор
+
+    // Устанавливаем атрибут для виджета, чтобы он удалялся при закрытии вкладки
+    itemTextEdit->setAttribute(Qt::WA_DeleteOnClose);
+
+    // Добавляем новый виджет в вкладки (tabWidget) с названием, основанным на имени файла
+    int index = ui->tabWidget->addTab(itemTextEdit, QFileInfo(jsonPath).baseName());
+    qDebug() << "Added tab at index: " << index;
+
+    // Устанавливаем новый индекс вкладки как текущий, чтобы сразу переключиться на неё
+    ui->tabWidget->setCurrentIndex(index);  // Переключаемся на новую вкладку
+}
+
+
+
+// Метод для извлечения данных из JSON файла заклинания и формирования строки для отображения
+QString MainWindow::extractItemContentFromJson(const QString &jsonPath)
+{
+    QFile file(jsonPath);
+    if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
+        qWarning() << "Не удалось открыть JSON файл:" << jsonPath;
+        return "";  // Возвращаем пустую строку, если файл не открыт
+    }
+
+    QJsonDocument doc = QJsonDocument::fromJson(file.readAll());
+    file.close();  // Закрываем файл после чтения
+
+    if (!doc.isObject()) {
+        qWarning() << "Некорректный формат JSON";
+        return "";  // Возвращаем пустую строку, если формат некорректен
+    }
+
+    // Получаем данные заклинания из JSON
+    QJsonObject obj = doc.object();
+    QString spellName = obj["name"].toString();
+    QString spellDescription = obj["description"].toString();
+
+    // Проверим, что данные корректны
+    qDebug() << "Item Name: " << spellName;
+    qDebug() << "Item Description: " << spellDescription;
+
+    // Формируем строку для отображения, которая содержит название и описание заклинания
+    QString spellContent = "Предмет: " + spellName + "\n\nОписание:\n" + spellDescription;
+    return spellContent;
+}
+
 
 
