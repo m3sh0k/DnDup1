@@ -1,0 +1,398 @@
+#include "mainwindow.h"
+#include "ui_mainwindow.h"
+
+MainWindow::MainWindow(QWidget *parent)
+    : QMainWindow(parent)
+    , ui(new Ui::MainWindow)
+{
+    ui->setupUi(this);
+    setupSideMenu();  // Настраиваем боковое меню
+    setupTreeView();  // Настраиваем файловое дерево
+
+    connect(ui->cart_treeView, &QTreeView::customContextMenuRequested, this, &MainWindow::on_cart_treeView_customContextMenuRequested);
+    connect(ui->cart_treeView, &QTreeView::doubleClicked, this, &MainWindow::on_cartItemDoubleClicked);
+
+    connect(ui->spells_treeView, &QTreeView::customContextMenuRequested, this, &MainWindow::on_spells_treeView_customContextMenuRequested); // Подключение контекстного меню для заклинаний
+    connect(ui->item_treeView, &QTreeView::customContextMenuRequested, this, &MainWindow::on_item_treeView_customContextMenuRequested);     // Подключение контекстного меню для предметов
+
+}
+
+MainWindow::~MainWindow()
+{
+    delete ui;
+}
+
+// Настройка бокового меню
+void MainWindow::setupSideMenu()
+{
+    // Создаем группу кнопок и добавляем кнопки
+    QButtonGroup *buttonGroup = new QButtonGroup(this);
+    buttonGroup->addButton(ui->monsters_pushButton);  // Кнопка "Бестиарий"
+    buttonGroup->addButton(ui->spells_pushButton);    // Кнопка "Заклинания"
+    buttonGroup->addButton(ui->item_pushButton);      // Кнопка "Предметы"
+    buttonGroup->addButton(ui->cart_pushButton);      // Кнопка "Карты"
+    buttonGroup->setExclusive(true);                 // Группа делает кнопки эксклюзивными
+}
+
+// Универсальная функция для переключения вкладок
+void MainWindow::on_category_pushButton_released(QWidget* /*page*/, QPushButton* button, int index) {
+    if (activeButton == button) {
+        ui->extended_side_menu->setVisible(!ui->extended_side_menu->isVisible());
+    } else {
+        activeButton = button;
+        ui->extended_side_menu->setCurrentIndex(index); // Устанавливаем нужную страницу
+        ui->extended_side_menu->setVisible(true);
+    }
+}
+
+// Функции для кнопок
+void MainWindow::on_monsters_pushButton_released()
+{
+    on_category_pushButton_released(ui->extended_side_menu, ui->monsters_pushButton, 0);
+}
+
+void MainWindow::on_spells_pushButton_released()
+{
+    on_category_pushButton_released(ui->extended_side_menu, ui->spells_pushButton, 1);
+}
+
+void MainWindow::on_item_pushButton_released()
+{
+    on_category_pushButton_released(ui->extended_side_menu, ui->item_pushButton, 2);
+}
+
+void MainWindow::on_cart_pushButton_released()
+{
+    on_category_pushButton_released(ui->extended_side_menu, ui->cart_pushButton, 3);
+}
+
+// Настройка файлового дерева
+void MainWindow::setupTreeView()
+{
+    // Путь к папкам
+    QString mapsPath = QDir::currentPath() + "/map";
+    QString monstersPath = QDir::currentPath() + "/monsters";
+    QString spellsPath = QDir::currentPath() + "/spells";
+    QString itemsPath = QDir::currentPath() + "/items";
+
+    // Проверка и создание папок, если их нет
+    QDir dir;
+    dir.mkpath(mapsPath);
+    dir.mkpath(monstersPath);
+    dir.mkpath(spellsPath);
+    dir.mkpath(itemsPath);
+
+    // Создание моделей файлов для каждой категории
+    fileSystemModel = new QFileSystemModel(this);
+    fileSystemModel->setRootPath(mapsPath);
+    ui->cart_treeView->setModel(fileSystemModel);
+    ui->cart_treeView->setRootIndex(fileSystemModel->index(mapsPath));
+
+    monstersModel = new QFileSystemModel(this);
+    monstersModel->setRootPath(monstersPath);
+    ui->monster_treeView->setModel(monstersModel);
+    ui->monster_treeView->setRootIndex(monstersModel->index(monstersPath));
+
+    spellsModel = new QFileSystemModel(this);
+    spellsModel->setRootPath(spellsPath);
+    ui->spells_treeView->setModel(spellsModel);
+    ui->spells_treeView->setRootIndex(spellsModel->index(spellsPath));
+
+    itemsModel = new QFileSystemModel(this);
+    itemsModel->setRootPath(itemsPath);
+    ui->item_treeView->setModel(itemsModel);
+    ui->item_treeView->setRootIndex(itemsModel->index(itemsPath));
+
+    // Скрытие ненужных столбцов
+    QList<QTreeView*> treeViews = {ui->cart_treeView, ui->monster_treeView, ui->spells_treeView, ui->item_treeView};
+    for (auto treeView : treeViews) {
+        treeView->hideColumn(1);  // Скрываем "Size"
+        treeView->hideColumn(2);  // Скрываем "Type"
+        treeView->hideColumn(3);  // Скрываем "Date"
+        treeView->setHeaderHidden(true);  // Отключаем заголовки
+        treeView->setContextMenuPolicy(Qt::CustomContextMenu);  // Включаем контекстное меню
+    }
+}
+
+void MainWindow::on_cart_treeView_customContextMenuRequested(const QPoint &pos)
+{
+    QMenu contextMenu(this);
+    QAction *addAction = contextMenu.addAction("Добавить папку");
+    QAction *addMapAction = contextMenu.addAction("Добавить карту");
+    QAction *removeAction = contextMenu.addAction("Удалить");
+
+    // Показываем меню в точке клика
+    QAction *selectedAction = contextMenu.exec(ui->cart_treeView->mapToGlobal(pos));
+
+    QModelIndex index = ui->cart_treeView->indexAt(pos);
+    QString parentDirPath = index.isValid() ? fileSystemModel->filePath(index) : QDir::currentPath() + "/map";
+
+    QDir dir(parentDirPath);
+
+    // Создаем папку /map, если она не существует
+    if (!dir.exists() && !parentDirPath.endsWith("/map")) {
+        dir.mkdir(parentDirPath);
+    }
+
+    if (selectedAction == addAction) {
+        createUniqueFolder(dir, "Новая папка");
+    } else if (selectedAction == addMapAction) {
+        QString filePath = QFileDialog::getOpenFileName(this, tr("Выберите карту"), QDir::homePath(),
+                                                        tr("Images (*.png *.jpg *.jpeg);;PDF Files (*.pdf);;All Files (*)"));
+        if (filePath.isEmpty()) return;
+        addMapToDirectory(parentDirPath, filePath);  // Теперь добавляем только JSON
+    } else if (selectedAction == removeAction) {
+        if (index.isValid()) {
+            removeFileOrFolder(index);
+        }
+    }
+}
+
+void MainWindow::createUniqueFolder(QDir &dir, const QString &baseName)
+{
+    QString folderName = baseName;
+    int counter = 1;
+
+    // Проверяем, существует ли папка с таким именем
+    while (dir.exists(folderName)) {
+        folderName = baseName + " " + QString::number(counter++);
+    }
+
+    if (dir.mkdir(folderName)) {
+        fileSystemModel->setRootPath(QDir::currentPath());
+    }
+}
+
+void MainWindow::addMapToDirectory(const QString &parentDirPath, const QString &filePath)
+{
+    QFileInfo fileInfo(filePath);
+    QString jsonFilePath = parentDirPath + "/" + fileInfo.completeBaseName() + ".json";  // Имя для JSON файла
+
+    // Создаем JSON с путем к изображению
+    createMapJson(jsonFilePath, filePath);
+
+    // Перезагружаем модель
+    fileSystemModel->setRootPath(QDir::currentPath());
+}
+
+void MainWindow::createMapJson(const QString &jsonFilePath, const QString &imagePath)
+{
+    QJsonObject mapObject;
+    mapObject["imagePath"] = imagePath;
+    mapObject["width"] = 1000;  // Пример: ширина карты (если нужно)
+    mapObject["height"] = 800;  // Пример: высота карты (если нужно)
+
+    QJsonDocument doc(mapObject);
+    QFile jsonFile(jsonFilePath);
+    if (jsonFile.open(QIODevice::WriteOnly)) {
+        jsonFile.write(doc.toJson());
+        jsonFile.close();
+    } else {
+        QMessageBox::warning(this, "Ошибка", "Не удалось создать JSON файл.");
+    }
+}
+
+void MainWindow::removeFileOrFolder(const QModelIndex &index)
+{
+    QString filePath = fileSystemModel->filePath(index);
+    QFileInfo fileInfo(filePath);
+
+    if (fileInfo.isDir()) {
+        QDir dir(filePath);
+        dir.removeRecursively();
+    } else {
+        QFile file(filePath);
+        file.remove();
+    }
+}
+
+void MainWindow::on_cartItemDoubleClicked(const QModelIndex &index)
+{
+    // Получаем путь к JSON файлу
+    QString jsonPath = fileSystemModel->filePath(index);
+
+    // Проверим, что это файл .json
+    if (jsonPath.endsWith(".json")) {
+        // Если файл JSON - добавляем карту
+        addMapTab(jsonPath);  // Ваша функция добавления новой вкладки с картой
+    } else {
+        qDebug() << "Выбран не JSON файл";
+    }
+}
+
+void MainWindow::addMapTab(const QString &jsonPath)
+{
+    // Создание нового виджета для отображения карты
+    mapviewwidget *newMapWidget = new mapviewwidget(ui->tabWidget);  // Важно указать родительский элемент, например ui->tabWidget
+
+    // Загружаем путь к изображению из JSON
+    QString mapPath = extractMapPathFromJson(jsonPath);
+    newMapWidget->loadMap(mapPath);  // Загружаем карту
+
+    // Устанавливаем атрибут для удаления при закрытии
+    newMapWidget->setAttribute(Qt::WA_DeleteOnClose);
+
+    // Добавляем новую вкладку в tabWidget
+    int index = ui->tabWidget->addTab(newMapWidget, QFileInfo(jsonPath).baseName());
+    ui->tabWidget->setCurrentIndex(index);
+}
+
+QString MainWindow::extractMapPathFromJson(const QString &jsonPath)
+{
+    QFile file(jsonPath);
+    if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
+        qWarning() << "Не удалось открыть JSON файл:" << jsonPath;
+        return "";
+    }
+
+    QJsonDocument doc = QJsonDocument::fromJson(file.readAll());
+    file.close();
+
+    if (!doc.isObject()) {
+        qWarning() << "Некорректный формат JSON";
+        return "";
+    }
+
+    // Извлекаем путь к изображению
+    QJsonObject obj = doc.object();
+    return obj["imagePath"].toString();  // Убедитесь, что путь к изображению правильно записан в JSON
+}
+
+
+
+// Добавляем новые функции для обработки контекстного меню в боковом меню для вкладок "Предметы" и "Заклинания"
+
+// Функция для вызова контекстного меню в боковом меню вкладки "Заклинания"
+void MainWindow::on_spells_treeView_customContextMenuRequested(const QPoint &pos)
+{
+    QMenu contextMenu(this);
+    QAction *addAction = contextMenu.addAction("Добавить папку");
+    QAction *addSpellAction = contextMenu.addAction("Создать заклинание");
+    QAction *removeAction = contextMenu.addAction("Удалить");
+
+    QAction *selectedAction = contextMenu.exec(ui->spells_treeView->mapToGlobal(pos));
+
+    QModelIndex index = ui->spells_treeView->indexAt(pos);
+    QString parentDirPath = index.isValid() ? spellsModel->filePath(index) : QDir::currentPath() + "/spells";
+
+    QDir dir(parentDirPath);
+
+    if (!dir.exists() && !parentDirPath.endsWith("/spells")) {
+        dir.mkdir(parentDirPath);
+    }
+
+    if (selectedAction == addAction) {
+        createUniqueFolder(dir, "Новая папка");
+    } else if (selectedAction == addSpellAction) {
+        createNewSpell(parentDirPath);  // Заменяем вызов на правильный
+    } else if (selectedAction == removeAction) {
+        if (index.isValid()) {
+            removeFileOrFolder(index);
+        }
+    }
+}
+
+// Функция для вызова контекстного меню в боковом меню вкладки "Предметы"
+void MainWindow::on_item_treeView_customContextMenuRequested(const QPoint &pos) {
+    QMenu contextMenu(this);
+    QAction *addAction = contextMenu.addAction("Добавить папку");
+    QAction *addItemAction = contextMenu.addAction("Добавить предмет");
+    QAction *removeAction = contextMenu.addAction("Удалить");
+
+    QAction *selectedAction = contextMenu.exec(ui->item_treeView->mapToGlobal(pos));
+
+    QModelIndex index = ui->item_treeView->indexAt(pos);
+    QString parentDirPath = index.isValid() ? itemsModel->filePath(index) : QDir::currentPath() + "/items";
+
+    QDir dir(parentDirPath);
+
+    if (!dir.exists() && !parentDirPath.endsWith("/items")) {
+        dir.mkdir(parentDirPath);
+    }
+
+    if (selectedAction == addAction) {
+        createUniqueFolder(dir, "Новая папка");
+    } else if (selectedAction == addItemAction) {
+        createNewItem(parentDirPath); // Новый метод для создания предмета
+    } else if (selectedAction == removeAction) {
+        if (index.isValid()) {
+            removeFileOrFolder(index);
+        }
+    }
+}
+
+void MainWindow::createNewItem(const QString &parentDirPath) {
+    // Диалог для ввода имени предмета
+    QString itemName = QInputDialog::getText(this, "Создание предмета", "Введите название предмета:");
+    if (itemName.isEmpty()) return;
+
+    // Диалог для ввода описания предмета
+    QString itemDescription = QInputDialog::getText(this, "Создание предмета", "Введите описание предмета:");
+    if (itemDescription.isEmpty()) return;
+
+    // Создаем экземпляр предмета
+    Item newItem(itemName, itemDescription);
+
+    // Определяем путь для JSON файла
+    QString jsonFilePath = parentDirPath + "/" + itemName + ".json";
+
+    // Сохраняем данные предмета в JSON файл
+    if (!newItem.saveToFile(jsonFilePath)) {
+        QMessageBox::warning(this, "Ошибка", "Не удалось сохранить предмет.");
+    }
+
+    // Обновляем модель файловой системы
+    itemsModel->setRootPath(QDir::currentPath());
+}
+
+void MainWindow::createNewSpell(const QString &parentDirPath)
+{
+    // Диалог для ввода имени предмета
+    QString spellName = QInputDialog::getText(this, "Создание заклинания", "Введите название заклинания:");
+    if (spellName.isEmpty()) return;
+
+    QString spellDescription = QInputDialog::getText(this, "Создание заклинания", "Введите описание заклинания:");
+    if (spellDescription.isEmpty()) return;
+
+
+    // Создаем экземпляр предмета
+    Spell newSpell(spellName, spellDescription);
+
+    // Определяем путь для JSON файла
+    QString jsonFilePath = parentDirPath + "/" + spellName + ".json";
+
+    // Сохраняем данные предмета в JSON файл
+    if (!newSpell.saveToFile(jsonFilePath)) {
+        QMessageBox::warning(this, "Ошибка", "Не удалось сохранить предмет.");
+    }
+
+    // Обновляем модель файловой системы
+    spellsModel->setRootPath(QDir::currentPath());
+}
+
+// Функция для добавления объекта заклинания в папку
+void MainWindow::addSpellToDirectory(const QString &parentDirPath, const QString &filePath)
+{
+    QFileInfo fileInfo(filePath);
+    QString spellFilePath = parentDirPath + "/" + fileInfo.fileName(); // Получаем путь для копирования
+
+    QFile::copy(filePath, spellFilePath); // Копируем файл в нужное место
+
+    spellsModel->setRootPath(QDir::currentPath()); // Перезагружаем модель для отображения изменений
+}
+
+
+
+
+// Функция для добавления объекта предмета в папку
+void MainWindow::addItemToDirectory(const QString &parentDirPath, const QString &filePath)
+{
+    QFileInfo fileInfo(filePath);
+    QString itemFilePath = parentDirPath + "/" + fileInfo.fileName(); // Получаем путь для копирования
+
+    QFile::copy(filePath, itemFilePath); // Копируем файл в нужное место
+
+    itemsModel->setRootPath(QDir::currentPath()); // Перезагружаем модель для отображения изменений
+}
+
+
