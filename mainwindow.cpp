@@ -421,13 +421,28 @@ void MainWindow::displaySpellContentInTab(const QString &jsonPath)
 
     // Создание нового виджета для отображения содержимого заклинания
     QTextEdit *spellTextEdit = new QTextEdit(ui->tabWidget);  // создаем QTextEdit для отображения текста заклинания
+    spellTextEdit->setReadOnly(true); // Устанавливаем текстовый редактор в режим "только чтение"
 
     // Загружаем данные из JSON файла с заклинанием
     QString spellContent = extractSpellContentFromJson(jsonPath);
     if (spellContent.isEmpty()) {
         qWarning() << "No content to display";
     }
-    spellTextEdit->setText(spellContent);  // Устанавливаем содержимое JSON в текстовый редактор
+
+    // Форматируем текст в HTML для стилизации
+    QString htmlContent = QString("<html><head>"
+                                  "<style>"
+                                  "h1 { color: blue; font-family: 'Arial'; }"  // Стили для заголовка заклинания
+                                  "p { font-size: 14px; line-height: 1.5; }"  // Стили для описания
+                                  "</style>"
+                                  "</head><body>"
+                                  "<h1>%1</h1>"  // Название заклинания
+                                  "<p>%2</p>"    // Описание заклинания
+                                  "</body></html>")
+                              .arg(spellContent.section("\n\nОписание:\n", 0, 0))  // Извлекаем заголовок из текста
+                              .arg(spellContent.section("\n\nОписание:\n", 1));   // Извлекаем описание
+
+    spellTextEdit->setHtml(htmlContent);  // Устанавливаем HTML содержимое в текстовый редактор
 
     // Устанавливаем атрибут для виджета, чтобы он удалялся при закрытии вкладки
     spellTextEdit->setAttribute(Qt::WA_DeleteOnClose);
@@ -493,17 +508,32 @@ void MainWindow::on_itemItemDoubleClicked(const QModelIndex &index)
 // Метод для отображения содержимого заклинания в новой вкладке
 void MainWindow::displayItemContentInTab(const QString &jsonPath)
 {
-    qDebug() << "Displaying spell content in new tab";
+    qDebug() << "Displaying item content in new tab";
 
-    // Создание нового виджета для отображения содержимого заклинания
-    QTextEdit *itemTextEdit = new QTextEdit(ui->tabWidget);  // создаем QTextEdit для отображения текста заклинания
+    // Создание нового виджета для отображения содержимого предмета
+    QTextEdit *itemTextEdit = new QTextEdit(ui->tabWidget);  // создаем QTextEdit для отображения текста предмета
+    itemTextEdit->setReadOnly(true); // Устанавливаем текстовый редактор в режим "только чтение"
 
-    // Загружаем данные из JSON файла с заклинанием
+    // Загружаем данные из JSON файла с предметом
     QString itemContent = extractItemContentFromJson(jsonPath);
     if (itemContent.isEmpty()) {
         qWarning() << "No content to display";
     }
-    itemTextEdit->setText(itemContent);  // Устанавливаем содержимое JSON в текстовый редактор
+
+    // Форматируем текст в HTML для стилизации
+    QString htmlContent = QString("<html><head>"
+                                  "<style>"
+                                  "h1 { color: green; font-family: 'Verdana'; }"  // Стили для заголовка предмета
+                                  "p { font-size: 14px; line-height: 1.5; color: #555; }"  // Стили для описания
+                                  "</style>"
+                                  "</head><body>"
+                                  "<h1>%1</h1>"  // Название предмета
+                                  "<p>%2</p>"    // Описание предмета
+                                  "</body></html>")
+                              .arg(itemContent.section("\n\nОписание:\n", 0, 0))  // Извлекаем заголовок из текста
+                              .arg(itemContent.section("\n\nОписание:\n", 1));   // Извлекаем описание
+
+    itemTextEdit->setHtml(htmlContent);  // Устанавливаем HTML содержимое в текстовый редактор
 
     // Устанавливаем атрибут для виджета, чтобы он удалялся при закрытии вкладки
     itemTextEdit->setAttribute(Qt::WA_DeleteOnClose);
@@ -548,6 +578,3 @@ QString MainWindow::extractItemContentFromJson(const QString &jsonPath)
     QString spellContent = "Предмет: " + spellName + "\n\nОписание:\n" + spellDescription;
     return spellContent;
 }
-
-
-

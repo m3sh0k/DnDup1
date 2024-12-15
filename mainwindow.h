@@ -19,6 +19,7 @@
 #include <QAction>
 #include <QPoint>
 #include <QTextEdit>
+#include <QTabWidget>
 #include "mapviewwidget.h"  // Ваш виджет для отображения карт
 #include "item.h"
 #include "spell.h"
